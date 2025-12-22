@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECHO echo - Expérience sonore</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0a1929;
+            color: #b0bec5;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #video-background {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translateX(-50%) translateY(-50%);
+            z-index: -1;
+            opacity: 0.4;
+            filter: blur(2px);
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .title {
+            font-size: clamp(3rem, 15vw, 12rem);
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 1rem;
+            line-height: 0.9;
+            letter-spacing: 0.05em;
+            color: rgba(176, 190, 197, 0.6);
+            text-shadow: 0 0 40px rgba(176, 190, 197, 0.3);
+        }
+
+        .subtitle {
+            font-size: clamp(0.9rem, 2vw, 1.2rem);
+            text-align: center;
+            margin-bottom: 3rem;
+            color: rgba(176, 190, 197, 0.8);
+            font-style: italic;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            padding: 0.8rem 2rem;
+            font-size: 1rem;
+            background: rgba(176, 190, 197, 0.05);
+            border: 2px solid rgba(176, 190, 197, 0.2);
+            color: rgba(176, 190, 197, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .mode-btn:hover {
+            background: rgba(176, 190, 197, 0.15);
+            border-color: rgba(176, 190, 197, 0.4);
+        }
+
+        .mode-btn.active {
+            background: rgba(176, 190, 197, 0.3);
+            border-color: rgba(176, 190, 197, 0.6);
+            color: #b0bec5;
+            box-shadow: 0 0 20px rgba(176, 190, 197, 0.4);
+            font-weight: bold;
+        }
+
+        .speakers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .speaker-btn {
+            padding: 1.2rem 1.5rem;
+            font-size: 1.1rem;
+            background: rgba(176, 190, 197, 0.05);
+            border: 2px solid rgba(176, 190, 197, 0.2);
+            color: #b0bec5;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 4px;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+
+        .speaker-btn:hover {
+            background: rgba(176, 190, 197, 0.15);
+            border-color: rgba(176, 190, 197, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .speaker-btn.playing {
+            background: rgba(176, 190, 197, 0.25);
+            border-color: rgba(176, 190, 197, 0.6);
+            box-shadow: 0 0 15px rgba(176, 190, 197, 0.3);
+        }
+
+        .speaker-btn.muted {
+            background: rgba(176, 190, 197, 0.08);
+            border-color: rgba(176, 190, 197, 0.15);
+            opacity: 0.6;
+        }
+
+        .info {
+            position: fixed;
+            bottom: 2rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: rgba(176, 190, 197, 0.6);
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .speakers-grid {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                gap: 0.8rem;
+            }
+
+            .speaker-btn {
+                padding: 1rem 1rem;
+                font-size: 1rem;
+            }
+
+            .info {
+                font-size: 0.75rem;
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <video id="video-background" autoplay loop muted playsinline>
+        <source src="video/demo.mp4" type="video/mp4">
+    </video>
+
+    <div class="container">
+        <h1 class="title">ECHO<br>echo</h1>
+        <p class="subtitle">Expérience sonore spatialisée</p>
+
+        <div class="controls">
+            <div class="mode-buttons">
+                <button id="mode-individual" class="mode-btn active">
+                    Mode Individuel
+                </button>
+                <button id="mode-sync" class="mode-btn">
+                    Mode Synchronisé
+                </button>
+            </div>
+
+            <div class="speakers-grid" id="speakers-grid">
+                <!-- Buttons will be generated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="info">
+            <p id="mode-info">Cliquez sur les enceintes pour les activer individuellement</p>
+        </div>
+    </div>
+
+    <script>
+        const speakers = [
+            // R series (R1-R7)
+            { name: "R1", file: "sound/R1.mp3" },
+            { name: "R2", file: "sound/R2.mp3" },
+            { name: "R3&R4", file: "sound/R3&R4.mp3" },
+            { name: "R5", file: "sound/R5.mp3" },
+            { name: "R6", file: "sound/R6.mp3" },
+            { name: "R7", file: "sound/R7.mp3" },
+            // G series (G1-G5) - Commented out for now
+            // { name: "G1", file: "sound/G1.mp3" },
+            // { name: "G2", file: "sound/G2.mp3" },
+            // { name: "G3", file: "sound/G3.mp3" },
+            // { name: "G4", file: "sound/G4.mp3" },
+            // { name: "G5", file: "sound/G5.mp3" },
+            // C series (C1-C3) - Commented out for now
+            // { name: "C1", file: "sound/C1.mp3" },
+            // { name: "C2", file: "sound/C2.mp3" },
+            // { name: "C3", file: "sound/C3.mp3" }
+        ];
+
+        let syncMode = false;
+        let audioElements = {};
+        let currentlyPlaying = null;
+
+        const modeIndividual = document.getElementById('mode-individual');
+        const modeSync = document.getElementById('mode-sync');
+        const modeInfo = document.getElementById('mode-info');
+        const speakersGrid = document.getElementById('speakers-grid');
+        const videoBackground = document.getElementById('video-background');
+
+        // Create speaker buttons
+        speakers.forEach(speaker => {
+            const button = document.createElement('button');
+            button.className = 'speaker-btn';
+            button.textContent = speaker.name;
+            button.dataset.speaker = speaker.name;
+            speakersGrid.appendChild(button);
+
+            // Create audio element
+            const audio = new Audio(speaker.file);
+            audio.loop = true;
+            audioElements[speaker.name] = audio;
+
+            button.addEventListener('click', () => handleSpeakerClick(speaker.name, button));
+        });
+
+        function handleSpeakerClick(speakerName, button) {
+            const audio = audioElements[speakerName];
+
+            if (!syncMode) {
+                // Normal mode: play one at a time
+                if (currentlyPlaying && currentlyPlaying !== speakerName) {
+                    audioElements[currentlyPlaying].pause();
+                    audioElements[currentlyPlaying].currentTime = 0;
+                    document.querySelector(`[data-speaker="${currentlyPlaying}"]`).classList.remove('playing');
+                }
+
+                if (audio.paused) {
+                    audio.play();
+                    button.classList.add('playing');
+                    currentlyPlaying = speakerName;
+                } else {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    button.classList.remove('playing');
+                    currentlyPlaying = null;
+                }
+            } else {
+                // Sync mode: toggle mute
+                audio.muted = !audio.muted;
+                if (audio.muted) {
+                    button.classList.remove('playing');
+                    button.classList.add('muted');
+                } else {
+                    button.classList.add('playing');
+                    button.classList.remove('muted');
+                }
+            }
+        }
+
+        // Ensure video plays
+        videoBackground.play().catch(err => {
+            console.log('Video autoplay prevented:', err);
+        });
+
+        // Mode Individual button
+        modeIndividual.addEventListener('click', () => {
+            if (!syncMode) return; // Already in individual mode
+
+            syncMode = false;
+            modeIndividual.classList.add('active');
+            modeSync.classList.remove('active');
+            modeInfo.textContent = 'Cliquez sur les enceintes pour les activer individuellement';
+
+            // Stop all audio from sync mode
+            Object.values(audioElements).forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+                audio.muted = false;
+            });
+
+            // Reset all buttons
+            document.querySelectorAll('.speaker-btn').forEach(btn => {
+                btn.classList.remove('playing', 'muted');
+            });
+        });
+
+        // Mode Synchronisé button
+        modeSync.addEventListener('click', () => {
+            if (syncMode) return; // Already in sync mode
+
+            syncMode = true;
+            modeSync.classList.add('active');
+            modeIndividual.classList.remove('active');
+            modeInfo.textContent = 'Tous les sons sont synchronisés. Cliquez pour activer/désactiver chaque enceinte.';
+
+            // Stop any currently playing audio from individual mode
+            if (currentlyPlaying) {
+                audioElements[currentlyPlaying].pause();
+                audioElements[currentlyPlaying].currentTime = 0;
+                document.querySelector(`[data-speaker="${currentlyPlaying}"]`).classList.remove('playing');
+                currentlyPlaying = null;
+            }
+
+            // Start all audio muted
+            Object.values(audioElements).forEach(audio => {
+                audio.muted = true;
+                audio.currentTime = 0;
+                audio.play();
+            });
+
+            // Mark all buttons as muted
+            document.querySelectorAll('.speaker-btn').forEach(btn => {
+                btn.classList.add('muted');
+                btn.classList.remove('playing');
+            });
+        });
+
+        // Handle audio end in normal mode
+        Object.entries(audioElements).forEach(([name, audio]) => {
+            audio.addEventListener('ended', () => {
+                if (!syncMode && currentlyPlaying === name) {
+                    document.querySelector(`[data-speaker="${name}"]`).classList.remove('playing');
+                    currentlyPlaying = null;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
