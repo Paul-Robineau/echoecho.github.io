@@ -70,6 +70,7 @@
             gap: 2rem;
             width: 100%;
             max-width: 900px;
+            padding-bottom: 2rem;
         }
 
         .mode-buttons {
@@ -171,6 +172,67 @@
             cursor: not-allowed;
         }
 
+        .progress-container {
+            width: 100%;
+            max-width: 700px;
+            margin-top: 2rem;
+            padding: 0 1rem;
+        }
+
+        .progress-wrapper {
+            position: relative;
+            width: 100%;
+            height: 8px;
+            background: rgba(176, 190, 197, 0.15);
+            border-radius: 4px;
+            cursor: pointer;
+            overflow: hidden;
+            border: 1px solid rgba(176, 190, 197, 0.2);
+        }
+
+        .progress-wrapper:hover {
+            background: rgba(176, 190, 197, 0.2);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg,
+                rgba(176, 190, 197, 0.6) 0%,
+                rgba(176, 190, 197, 0.8) 100%);
+            transition: width 0.1s linear;
+            box-shadow: 0 0 10px rgba(176, 190, 197, 0.4);
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: rgba(176, 190, 197, 0.9);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(176, 190, 197, 0.6);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .progress-wrapper:hover .progress-bar::after {
+            opacity: 1;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: rgba(176, 190, 197, 0.6);
+            font-family: monospace;
+        }
+
         .info {
             position: fixed;
             bottom: 2rem;
@@ -235,6 +297,16 @@
                     Tout désélectionner
                 </button>
             </div>
+
+            <div class="progress-container">
+                <div class="progress-wrapper" id="progress-wrapper">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
         </div>
 
         <div class="info">
@@ -274,6 +346,10 @@
         const videoBackground = document.getElementById('video-background');
         const selectAllBtn = document.getElementById('select-all');
         const deselectAllBtn = document.getElementById('deselect-all');
+        const progressWrapper = document.getElementById('progress-wrapper');
+        const progressBar = document.getElementById('progress-bar');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const durationDisplay = document.getElementById('duration');
 
         // Create speaker buttons
         speakers.forEach(speaker => {
@@ -417,6 +493,67 @@
                 btn.classList.remove('playing');
                 btn.classList.add('muted');
             });
+        });
+
+        // Progress bar functions
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateProgress() {
+            let currentAudio = null;
+
+            if (syncMode) {
+                // In sync mode, use the first audio element as reference
+                currentAudio = Object.values(audioElements)[0];
+            } else if (currentlyPlaying) {
+                // In individual mode, use the currently playing audio
+                currentAudio = audioElements[currentlyPlaying];
+            }
+
+            if (currentAudio && !isNaN(currentAudio.duration)) {
+                const progress = (currentAudio.currentTime / currentAudio.duration) * 100;
+                progressBar.style.width = `${progress}%`;
+                currentTimeDisplay.textContent = formatTime(currentAudio.currentTime);
+                durationDisplay.textContent = formatTime(currentAudio.duration);
+            } else {
+                progressBar.style.width = '0%';
+                currentTimeDisplay.textContent = '0:00';
+                durationDisplay.textContent = '0:00';
+            }
+        }
+
+        // Update progress bar continuously
+        setInterval(updateProgress, 100);
+
+        // Make progress bar interactive (seekable)
+        progressWrapper.addEventListener('click', (e) => {
+            const rect = progressWrapper.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+
+            if (syncMode) {
+                // Seek all audio elements in sync mode
+                Object.values(audioElements).forEach(audio => {
+                    if (!isNaN(audio.duration)) {
+                        audio.currentTime = percentage * audio.duration;
+                    }
+                });
+            } else if (currentlyPlaying) {
+                // Seek only the currently playing audio in individual mode
+                const currentAudio = audioElements[currentlyPlaying];
+                if (!isNaN(currentAudio.duration)) {
+                    currentAudio.currentTime = percentage * currentAudio.duration;
+                }
+            }
+        });
+
+        // Update duration when audio metadata is loaded
+        Object.values(audioElements).forEach(audio => {
+            audio.addEventListener('loadedmetadata', updateProgress);
         });
 
         // Handle audio end in normal mode
